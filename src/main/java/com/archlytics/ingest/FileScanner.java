@@ -64,19 +64,16 @@ public final class FileScanner {
   }
 
   /**
-   * Groups files into modules using Maven-style layout: everything under {@code src/main/java} or
-   * {@code src/test/java} is grouped by the first path segment after {@code java/} (the package
-   * root), or by the nearest {@code pom.xml} parent directory when present.
+   * Groups files into Maven-style modules: the directory segment immediately before {@code /src/}.
+   * Example: {@code java/maroctax-api/src/main/java/...} → {@code maroctax-api}.
    */
   static String inferModule(Path relativePath) {
     String normalized = relativePath.toString().replace('\\', '/');
-    int javaIndex = normalized.indexOf("src/main/java/");
-    if (javaIndex >= 0) {
-      String afterJava = normalized.substring(javaIndex + "src/main/java/".length());
-      int slash = afterJava.indexOf('/');
-      if (slash > 0) {
-        return afterJava.substring(0, slash);
-      }
+    int srcIndex = normalized.indexOf("/src/");
+    if (srcIndex > 0) {
+      String beforeSrc = normalized.substring(0, srcIndex);
+      int lastSlash = beforeSrc.lastIndexOf('/');
+      return lastSlash >= 0 ? beforeSrc.substring(lastSlash + 1) : beforeSrc;
     }
 
     int firstSlash = normalized.indexOf('/');

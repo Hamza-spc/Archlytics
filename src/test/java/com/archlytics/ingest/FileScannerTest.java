@@ -34,12 +34,12 @@ class FileScannerTest {
 
     assertEquals(1, files.size());
     assertTrue(files.get(0).relativePath().toString().endsWith("App.java"));
-    assertEquals("com", files.get(0).module());
+    assertEquals("module-a", files.get(0).module());
   }
 
   @Test
-  void inferModule_usesPackageRootAfterSrcMainJava() {
+  void inferModule_usesMavenModuleDirectory() {
     Path relative = Path.of("java/maroctax-api/src/main/java/ma/maroctax/api/App.java");
-    assertEquals("ma", FileScanner.inferModule(relative));
+    assertEquals("maroctax-api", FileScanner.inferModule(relative));
   }
 }
