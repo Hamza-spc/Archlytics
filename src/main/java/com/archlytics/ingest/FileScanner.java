@@ -83,18 +83,18 @@ public final class FileScanner {
     return results;
   }
 
-  static Set<String> ignoredDirectories(ArchlyticsConfig config) {
+  public static Set<String> ignoredDirectories(ArchlyticsConfig config) {
     Set<String> ignored = new HashSet<>(DEFAULT_IGNORED_DIRS);
     ignored.addAll(config.ignore.directories);
     return ignored;
   }
 
-  static List<PathMatcher> pathMatchers(List<String> patterns) {
+  public static List<PathMatcher> pathMatchers(List<String> patterns) {
     FileSystem fileSystem = FileSystems.getDefault();
     return patterns.stream().map(pattern -> fileSystem.getPathMatcher("glob:" + pattern)).toList();
   }
 
-  static boolean matchesAnyPattern(Path relativePath, List<PathMatcher> matchers) {
+  public static boolean matchesAnyPattern(Path relativePath, List<PathMatcher> matchers) {
     for (PathMatcher matcher : matchers) {
       if (matcher.matches(relativePath)) {
         return true;
@@ -107,7 +107,7 @@ public final class FileScanner {
    * Groups files into Maven-style modules: the directory segment immediately before {@code /src/}.
    * Example: {@code java/maroctax-api/src/main/java/...} → {@code maroctax-api}.
    */
-  static String inferModule(Path relativePath) {
+  public static String inferModule(Path relativePath) {
     String normalized = relativePath.toString().replace('\\', '/');
     int srcIndex = normalized.indexOf("/src/");
     if (srcIndex > 0) {

@@ -4,6 +4,7 @@ import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
+import com.archlytics.pr.PullRequestAnalysis;
 import com.archlytics.snapshot.RunComparison;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,12 +25,14 @@ public final class MarkdownReport {
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
       RunComparison comparison,
+      PullRequestAnalysis pullRequestAnalysis,
       AiAnalysisResult ai) {
     StringBuilder md = new StringBuilder();
 
     md.append("# Archlytics Architecture Report\n\n");
     appendHealthScore(md, healthScore);
     appendComparison(md, comparison);
+    appendPullRequestAnalysis(md, pullRequestAnalysis);
     md.append("**Repository:** `").append(repoPath).append("`\n\n");
     md.append("**Generated:** ")
         .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
@@ -58,12 +61,14 @@ public final class MarkdownReport {
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
-      RunComparison comparison) {
+      RunComparison comparison,
+      PullRequestAnalysis pullRequestAnalysis) {
     StringBuilder md = new StringBuilder();
 
     md.append("# Archlytics Architecture Report\n\n");
     appendHealthScore(md, healthScore);
     appendComparison(md, comparison);
+    appendPullRequestAnalysis(md, pullRequestAnalysis);
     md.append("**Repository:** `").append(repoPath).append("`\n\n");
     md.append("**Generated:** ")
         .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
@@ -129,6 +134,52 @@ public final class MarkdownReport {
 
     if (comparison.newViolations().isEmpty() && comparison.resolvedViolations().isEmpty()) {
       md.append("_No violation changes since baseline._\n\n");
+    }
+  }
+
+  private static void appendPullRequestAnalysis(StringBuilder md, PullRequestAnalysis pr) {
+    if (pr == null) {
+      return;
+    }
+
+    md.append("## Pull Request Analysis\n\n");
+    md.append("**Base → Head:** `")
+        .append(pr.baseRef())
+        .append("` → `")
+        .append(pr.headRef())
+        .append("`\n\n");
+    md.append("**Changed Java files:** ").append(pr.changedFiles().size()).append("\n\n");
+
+    if (!pr.changedModules().isEmpty()) {
+      md.append("**Changed modules:** ")
+          .append(String.join(", ", pr.changedModules()))
+          .append("\n\n");
+    }
+
+    md.append("**Health drift:** ").append(pr.violationComparison().scoreSummary()).append("\n\n");
+
+    if (!pr.newModuleEdges().isEmpty()) {
+      md.append("### New module dependencies\n\n");
+      for (String edge : pr.newModuleEdges()) {
+        md.append("- ").append(edge).append("\n");
+      }
+      md.append("\n");
+    }
+
+    if (!pr.introducedViolations().isEmpty()) {
+      md.append("### Violations introduced by this PR\n\n");
+      for (Violation violation : pr.introducedViolations()) {
+        md.append("- **[")
+            .append(violation.severity())
+            .append("]** ")
+            .append(violation.title())
+            .append(" — ")
+            .append(violation.evidence())
+            .append("\n");
+      }
+      md.append("\n");
+    } else {
+      md.append("_No new violations introduced compared to base._\n\n");
     }
   }
 

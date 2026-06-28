@@ -199,6 +199,16 @@ java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --compare latest --skip
 
 Snapshots are stored in `<repo>/.archlytics/snapshots/` as JSON. Reports include score drift, new violations, and resolved violations.
 
+## Pull request analysis
+
+Compare a PR branch against its base ref and flag architecture regressions:
+
+```bash
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --base origin/main --head HEAD --skip-ai
+```
+
+Reports include changed files/modules, new module dependencies, and violations introduced compared to base.
+
 ## What it detects
 
 ### Deterministic rules (no AI)

@@ -19,6 +19,7 @@ import com.archlytics.report.ReportFormat;
 import com.archlytics.report.ReportWriter;
 import com.archlytics.rules.RuleEngine;
 import com.archlytics.rules.Violation;
+import com.archlytics.pr.PullRequestAnalysis;
 import com.archlytics.snapshot.RunComparison;
 import com.archlytics.snapshot.RunSnapshot;
 import com.archlytics.snapshot.SnapshotComparer;
@@ -41,7 +42,7 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "archlytics",
     mixinStandardHelpOptions = true,
-    version = "0.5.0",
+    version = "0.6.0",
     description = "Analyze a Java repository and infer its architecture.")
 public class AnalyzeCommand implements Callable<Integer> {
 
@@ -87,6 +88,16 @@ public class AnalyzeCommand implements Callable<Integer> {
       paramLabel = "SNAPSHOT")
   String compareTarget;
 
+  @Option(
+      names = "--base",
+      description = "PR analysis: base git ref (e.g. origin/main)")
+  String baseRef;
+
+  @Option(
+      names = "--head",
+      description = "PR analysis: head git ref (default: HEAD)")
+  String headRef;
+
   @Override
   public Integer call() throws IOException {
     Path absoluteRepo = repoPath.toAbsolutePath().normalize();
@@ -125,6 +136,12 @@ public class AnalyzeCommand implements Callable<Integer> {
       comparison = SnapshotComparer.compare(baseline, currentSnapshot);
     }
 
+    PullRequestAnalysis pullRequestAnalysis = null;
+    if (baseRef != null && !baseRef.isBlank()) {
+      String head = headRef == null || headRef.isBlank() ? "HEAD" : headRef;
+      pullRequestAnalysis = PullRequestAnalysis.analyze(absoluteRepo, baseRef, head, config);
+    }
+
     System.out.println("Archlytics — Architecture analysis");
     System.out.println("Repository: " + absoluteRepo);
     printConfigSource(absoluteRepo, configPath);
@@ -137,6 +154,21 @@ public class AnalyzeCommand implements Callable<Integer> {
               + " new, -"
               + comparison.resolvedViolations().size()
               + " resolved");
+    }
+    if (pullRequestAnalysis != null) {
+      System.out.println(
+          "PR analysis: "
+              + pullRequestAnalysis.baseRef()
+              + " → "
+              + pullRequestAnalysis.headRef()
+              + " ("
+              + pullRequestAnalysis.changedFiles().size()
+              + " files changed)");
+      System.out.println(
+          "PR violations introduced: " + pullRequestAnalysis.introducedViolations().size());
+      if (!pullRequestAnalysis.newModuleEdges().isEmpty()) {
+        System.out.println("PR new module edges: " + pullRequestAnalysis.newModuleEdges().size());
+      }
     }
     System.out.println("Java files: " + files.size());
     System.out.println("Modules: " + graph.modules().size());
@@ -167,6 +199,7 @@ public class AnalyzeCommand implements Callable<Integer> {
             diagrams,
             healthScore,
             comparison,
+            pullRequestAnalysis,
             ai,
             runAi,
             reportFormat);
@@ -189,6 +222,9 @@ public class AnalyzeCommand implements Callable<Integer> {
     if (comparison != null) {
       printComparisonDetails(comparison);
     }
+    if (pullRequestAnalysis != null) {
+      printPullRequestDetails(pullRequestAnalysis);
+    }
     if (ai != null) {
       printSystemDesignHighlights(violations, ai);
     }
@@ -209,6 +245,7 @@ public class AnalyzeCommand implements Callable<Integer> {
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
       RunComparison comparison,
+      PullRequestAnalysis pullRequestAnalysis,
       AiAnalysisResult ai,
       boolean runAi,
       ReportFormat reportFormat)
@@ -229,6 +266,7 @@ public class AnalyzeCommand implements Callable<Integer> {
                   diagrams,
                   healthScore,
                   comparison,
+                  pullRequestAnalysis,
                   ai)
               : MarkdownReport.renderWithoutAi(
                   absoluteRepo.toString(),
@@ -238,7 +276,8 @@ public class AnalyzeCommand implements Callable<Integer> {
                   violations,
                   diagrams,
                   healthScore,
-                  comparison);
+                  comparison,
+                  pullRequestAnalysis);
       Files.writeString(mdPath, markdown);
       written.add(mdPath);
     }
@@ -255,6 +294,7 @@ public class AnalyzeCommand implements Callable<Integer> {
                   diagrams,
                   healthScore,
                   comparison,
+                  pullRequestAnalysis,
                   ai)
               : HtmlReport.renderWithoutAi(
                   absoluteRepo.toString(),
@@ -264,7 +304,8 @@ public class AnalyzeCommand implements Callable<Integer> {
                   violations,
                   diagrams,
                   healthScore,
-                  comparison);
+                  comparison,
+                  pullRequestAnalysis);
       Files.writeString(htmlPath, html);
       written.add(htmlPath);
     }
@@ -310,6 +351,25 @@ public class AnalyzeCommand implements Callable<Integer> {
     if (!comparison.resolvedViolations().isEmpty()) {
       System.out.println("Resolved violations:");
       comparison.resolvedViolations().forEach(v -> System.out.println("  - " + v));
+    }
+  }
+
+  private static void printPullRequestDetails(PullRequestAnalysis pr) {
+    System.out.println();
+    System.out.println("PR changed files:");
+    pr.changedFiles().forEach(path -> System.out.println("  * " + path));
+
+    if (!pr.newModuleEdges().isEmpty()) {
+      System.out.println("New module dependencies:");
+      pr.newModuleEdges().forEach(edge -> System.out.println("  + " + edge));
+    }
+
+    if (!pr.introducedViolations().isEmpty()) {
+      System.out.println("Violations introduced by PR:");
+      for (Violation violation : pr.introducedViolations()) {
+        System.out.printf(
+            "  [%s] %s — %s%n", violation.severity(), violation.title(), violation.evidence());
+      }
     }
   }
 

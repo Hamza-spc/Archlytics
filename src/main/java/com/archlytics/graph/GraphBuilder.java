@@ -1,8 +1,7 @@
 package com.archlytics.graph;
 
+import com.archlytics.ingest.JavaSources;
 import com.archlytics.ingest.ScannedFile;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,15 +68,11 @@ public final class GraphBuilder {
 
   private static Set<Path> resolveFileDependencies(ScannedFile file, ClassIndex index) {
     Set<Path> dependencies = new LinkedHashSet<>();
-    try {
-      String source = Files.readString(file.absolutePath());
-      for (String importedType : JavaSourceParser.parseImports(source)) {
-        index
-            .find(importedType)
-            .ifPresent(target -> dependencies.add(target.relativePath()));
-      }
-    } catch (IOException e) {
-      throw new IllegalStateException("Failed to read " + file.absolutePath(), e);
+    String source = JavaSources.read(file);
+    for (String importedType : JavaSourceParser.parseImports(source)) {
+      index
+          .find(importedType)
+          .ifPresent(target -> dependencies.add(target.relativePath()));
     }
     return dependencies;
   }

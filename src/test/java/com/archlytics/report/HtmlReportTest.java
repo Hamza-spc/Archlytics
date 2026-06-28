@@ -41,7 +41,7 @@ class HtmlReportTest {
 
     String html =
         HtmlReport.renderWithoutAi(
-            "/repo/path", 8, graph, metrics, violations, diagrams, healthScore, null);
+            "/repo/path", 8, graph, metrics, violations, diagrams, healthScore, null, null);
 
     assertTrue(html.contains("<!DOCTYPE html>"));
     assertTrue(html.contains("Print / Save PDF"));

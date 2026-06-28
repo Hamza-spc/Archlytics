@@ -4,6 +4,7 @@ import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
+import com.archlytics.pr.PullRequestAnalysis;
 import com.archlytics.snapshot.RunComparison;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,9 +25,20 @@ public final class HtmlReport {
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
       RunComparison comparison,
+      PullRequestAnalysis pullRequestAnalysis,
       AiAnalysisResult ai) {
     return renderInternal(
-        repoPath, fileCount, graph, metrics, violations, diagrams, healthScore, comparison, ai, false);
+        repoPath,
+        fileCount,
+        graph,
+        metrics,
+        violations,
+        diagrams,
+        healthScore,
+        comparison,
+        pullRequestAnalysis,
+        ai,
+        false);
   }
 
   public static String renderWithoutAi(
@@ -37,9 +49,20 @@ public final class HtmlReport {
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
-      RunComparison comparison) {
+      RunComparison comparison,
+      PullRequestAnalysis pullRequestAnalysis) {
     return renderInternal(
-        repoPath, fileCount, graph, metrics, violations, diagrams, healthScore, comparison, null, true);
+        repoPath,
+        fileCount,
+        graph,
+        metrics,
+        violations,
+        diagrams,
+        healthScore,
+        comparison,
+        pullRequestAnalysis,
+        null,
+        true);
   }
 
   private static String renderInternal(
@@ -51,6 +74,7 @@ public final class HtmlReport {
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
       RunComparison comparison,
+      PullRequestAnalysis pullRequestAnalysis,
       AiAnalysisResult ai,
       boolean skipAi) {
     String generated =
@@ -77,6 +101,7 @@ public final class HtmlReport {
 
     appendHealthDashboard(html, healthScore, fileCount, graph.modules().size(), violations.size());
     appendComparison(html, comparison);
+    appendPullRequestAnalysis(html, pullRequestAnalysis);
 
     if (skipAi) {
       html.append("<section class=\"card notice\"><p>AI analysis skipped. Deterministic analysis only.</p></section>\n");
@@ -164,6 +189,60 @@ public final class HtmlReport {
 
     if (comparison.newViolations().isEmpty() && comparison.resolvedViolations().isEmpty()) {
       html.append("<p class=\"muted\">No violation changes since baseline.</p>\n");
+    }
+
+    html.append("</section>\n");
+  }
+
+  private static void appendPullRequestAnalysis(StringBuilder html, PullRequestAnalysis pr) {
+    if (pr == null) {
+      return;
+    }
+
+    html.append("<section class=\"card drift\"><h2>Pull Request Analysis</h2>\n");
+    html.append("<p><strong>Base → Head:</strong> <code>")
+        .append(escape(pr.baseRef()))
+        .append("</code> → <code>")
+        .append(escape(pr.headRef()))
+        .append("</code></p>\n");
+    html.append("<p><strong>Changed Java files:</strong> ")
+        .append(pr.changedFiles().size())
+        .append("</p>\n");
+
+    if (!pr.changedModules().isEmpty()) {
+      html.append("<p><strong>Changed modules:</strong> ")
+          .append(escape(String.join(", ", pr.changedModules())))
+          .append("</p>\n");
+    }
+
+    html.append("<p><strong>Health drift:</strong> ")
+        .append(escape(pr.violationComparison().scoreSummary()))
+        .append("</p>\n");
+
+    if (!pr.newModuleEdges().isEmpty()) {
+      html.append("<h3>New module dependencies</h3><ul>\n");
+      for (String edge : pr.newModuleEdges()) {
+        html.append("<li>").append(escape(edge)).append("</li>\n");
+      }
+      html.append("</ul>\n");
+    }
+
+    if (!pr.introducedViolations().isEmpty()) {
+      html.append("<h3>Violations introduced by this PR</h3><div class=\"violations\">\n");
+      for (Violation violation : pr.introducedViolations()) {
+        html.append("<div class=\"violation\">");
+        html.append("<span class=\"badge badge-")
+            .append(violation.severity().name().toLowerCase())
+            .append("\">")
+            .append(violation.severity())
+            .append("</span> ");
+        html.append("<strong>").append(escape(violation.title())).append("</strong>");
+        html.append("<p>").append(escape(violation.evidence())).append("</p>");
+        html.append("</div>\n");
+      }
+      html.append("</div>\n");
+    } else {
+      html.append("<p class=\"muted\">No new violations introduced compared to base.</p>\n");
     }
 
     html.append("</section>\n");
