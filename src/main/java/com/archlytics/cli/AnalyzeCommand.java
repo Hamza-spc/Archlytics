@@ -4,6 +4,8 @@ import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphBuilder;
 import com.archlytics.ingest.FileScanner;
 import com.archlytics.ingest.ScannedFile;
+import com.archlytics.rules.RuleEngine;
+import com.archlytics.rules.Violation;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -36,27 +38,15 @@ public class AnalyzeCommand implements Callable<Integer> {
 
     List<ScannedFile> files = FileScanner.scan(absoluteRepo);
     DependencyGraph graph = GraphBuilder.build(files);
+    List<Violation> violations = RuleEngine.analyze(graph);
 
-    System.out.println("Archlytics — Phase 2: Dependency graph");
+    System.out.println("Archlytics — Phase 3: Architecture rules");
     System.out.println("Repository: " + absoluteRepo);
     System.out.println("Java files: " + files.size());
-    System.out.println("Internal file edges: " + graph.fileDependencies().size());
+    System.out.println("Modules: " + graph.modules().size());
+    System.out.println("Violations: " + violations.size());
     System.out.println();
 
-    System.out.println("Modules:");
-    for (Map.Entry<String, DependencyGraph.ModuleInfo> entry : graph.modules().entrySet()) {
-      DependencyGraph.ModuleInfo info = entry.getValue();
-      System.out.printf(
-          "  %s (%d files)%n", entry.getKey(), info.fileCount());
-      if (!info.dependsOn().isEmpty()) {
-        System.out.println("    depends on → " + String.join(", ", info.dependsOn()));
-      }
-      if (!info.usedBy().isEmpty()) {
-        System.out.println("    used by    ← " + String.join(", ", info.usedBy()));
-      }
-    }
-
-    System.out.println();
     System.out.println("Module dependency map:");
     for (Map.Entry<String, Set<String>> entry : graph.moduleDependencies().entrySet()) {
       if (!entry.getValue().isEmpty()) {
@@ -65,19 +55,16 @@ public class AnalyzeCommand implements Callable<Integer> {
     }
 
     System.out.println();
-    System.out.println("Sample file dependencies (first 5):");
-    graph.fileDependencies().entrySet().stream()
-        .limit(5)
-        .forEach(
-            e ->
-                System.out.println(
-                    "  "
-                        + e.getKey()
-                        + " → "
-                        + e.getValue().stream()
-                            .map(Path::toString)
-                            .reduce((a, b) -> a + ", " + b)
-                            .orElse("")));
+    if (violations.isEmpty()) {
+      System.out.println("No violations detected.");
+    } else {
+      System.out.println("Violations:");
+      for (Violation violation : violations) {
+        System.out.printf(
+            "  [%s] %s — %s%n", violation.severity(), violation.title(), violation.evidence());
+        System.out.printf("         rule: %s%n", violation.rule());
+      }
+    }
 
     return 0;
   }
