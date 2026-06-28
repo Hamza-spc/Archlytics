@@ -11,6 +11,8 @@ import com.archlytics.ingest.FileScanner;
 import com.archlytics.ingest.ScannedFile;
 import com.archlytics.report.ArchitectureDiagrams;
 import com.archlytics.report.DiagramGenerator;
+import com.archlytics.report.HealthScore;
+import com.archlytics.report.HealthScoreCalculator;
 import com.archlytics.report.MarkdownReport;
 import com.archlytics.rules.RuleEngine;
 import com.archlytics.rules.Violation;
@@ -73,10 +75,12 @@ public class AnalyzeCommand implements Callable<Integer> {
         GraphMetrics.compute(graph, config.rules.systemDesign.hubFanInThreshold);
     List<Violation> violations = RuleEngine.analyze(graph, config);
     ArchitectureDiagrams diagrams = DiagramGenerator.generate(graph);
+    HealthScore healthScore = HealthScoreCalculator.calculate(violations, metrics, config);
 
     System.out.println("Archlytics — Architecture analysis");
     System.out.println("Repository: " + absoluteRepo);
     printConfigSource(absoluteRepo, configPath);
+    System.out.println("Architecture health: " + healthScore.score() + "/100 — " + healthScore.label());
     System.out.println("Java files: " + files.size());
     System.out.println("Modules: " + graph.modules().size());
     System.out.println("Violations: " + violations.size());
@@ -93,7 +97,7 @@ public class AnalyzeCommand implements Callable<Integer> {
     if (!runAi) {
       report =
           MarkdownReport.renderWithoutAi(
-              absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams);
+              absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams, healthScore);
       Files.writeString(reportPath, report);
       printGraphAndViolations(graph, violations);
       System.out.println();
@@ -109,7 +113,7 @@ public class AnalyzeCommand implements Callable<Integer> {
 
     report =
         MarkdownReport.render(
-            absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams, ai);
+            absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams, healthScore, ai);
 
     Files.writeString(reportPath, report);
 

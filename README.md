@@ -90,7 +90,7 @@ mvn -q package
 java -jar target/archlytics-0.1.0-SNAPSHOT.jar /path/to/your/java/repo
 ```
 
-Output is written to `archlytics-report.md` in the current directory.
+Output is written to `archlytics-report.md` in the current directory. Every report includes an **architecture health score** (0–100) computed deterministically from violations and graph shape.
 
 ### CLI options
 
@@ -156,6 +156,24 @@ GROQ_API_KEY=gsk_your_key_here
 | `GEMINI_API_KEY` | Free key from [Google AI Studio](https://aistudio.google.com/apikey) |
 
 ---
+
+## Architecture health score
+
+Deterministic scoring (not AI):
+
+| Penalty | Amount |
+|---------|--------|
+| HIGH violation | −15 |
+| MEDIUM violation | −8 |
+| LOW violation | −3 |
+| Circular dependency | −5 |
+| Deep dependency chain | −5 |
+
+| Score | Label |
+|-------|-------|
+| 80–100 | Healthy |
+| 60–79 | Needs attention |
+| 0–59 | Critical |
 
 ## What it detects
 

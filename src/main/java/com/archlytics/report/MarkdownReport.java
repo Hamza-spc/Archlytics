@@ -21,10 +21,12 @@ public final class MarkdownReport {
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
+      HealthScore healthScore,
       AiAnalysisResult ai) {
     StringBuilder md = new StringBuilder();
 
     md.append("# Archlytics Architecture Report\n\n");
+    appendHealthScore(md, healthScore);
     md.append("**Repository:** `").append(repoPath).append("`\n\n");
     md.append("**Generated:** ")
         .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
@@ -51,10 +53,12 @@ public final class MarkdownReport {
       DependencyGraph graph,
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
-      ArchitectureDiagrams diagrams) {
+      ArchitectureDiagrams diagrams,
+      HealthScore healthScore) {
     StringBuilder md = new StringBuilder();
 
     md.append("# Archlytics Architecture Report\n\n");
+    appendHealthScore(md, healthScore);
     md.append("**Repository:** `").append(repoPath).append("`\n\n");
     md.append("**Generated:** ")
         .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
@@ -69,6 +73,24 @@ public final class MarkdownReport {
     appendDiagrams(md, diagrams, null);
 
     return md.toString();
+  }
+
+  private static void appendHealthScore(StringBuilder md, HealthScore healthScore) {
+    md.append("## Architecture Health\n\n");
+    md.append("**Score: ")
+        .append(healthScore.score())
+        .append("/100** — ")
+        .append(healthScore.label())
+        .append("\n\n");
+
+    if (!healthScore.topRisks().isEmpty()) {
+      md.append("### Top risks\n\n");
+      int index = 1;
+      for (String risk : healthScore.topRisks()) {
+        md.append(index++).append(". ").append(risk).append("\n");
+      }
+      md.append("\n");
+    }
   }
 
   private static void appendGraphMetrics(

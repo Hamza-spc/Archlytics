@@ -2,6 +2,7 @@ package com.archlytics.report;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
@@ -35,6 +36,9 @@ class MarkdownReportTest {
                 "Shared kernel bottleneck",
                 "core is depended on by 2 modules"));
 
+    HealthScore healthScore =
+        HealthScoreCalculator.calculate(violations, metrics, ArchlyticsConfig.defaults());
+
     AiAnalysisResult ai =
         new AiAnalysisResult(
             "Layered monolith",
@@ -49,9 +53,10 @@ class MarkdownReportTest {
             "graph TD\n  api-->core");
 
     String report =
-        MarkdownReport.render("/repo", 8, graph, metrics, violations, diagrams, ai);
+        MarkdownReport.render("/repo", 8, graph, metrics, violations, diagrams, healthScore, ai);
 
-    assertTrue(report.contains("## Architecture Diagrams"));
+    assertTrue(report.contains("## Architecture Health"));
+    assertTrue(report.contains("/100"));
     assertTrue(report.contains("### Layer View"));
     assertTrue(report.contains("## System Design Issues"));
     assertTrue(report.contains("## Scaling & Bottleneck Analysis"));
