@@ -8,7 +8,7 @@ import java.util.List;
 public final class RuleEngine {
 
   private static final List<Rule> RULES =
-      List.of(new CircularDependencyRule(), new HighCouplingRule());
+      List.of(new CircularDependencyRule(), new HighCouplingRule(), new SystemDesignRule());
 
   private RuleEngine() {}
 

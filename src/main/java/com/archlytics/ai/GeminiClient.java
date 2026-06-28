@@ -100,10 +100,30 @@ public final class GeminiClient {
               node.path("title").asText(), node.path("detail").asText()));
     }
 
+    List<AiAnalysisResult.SystemDesignIssue> systemDesignIssues = new ArrayList<>();
+    for (JsonNode node : json.path("systemDesignIssues")) {
+      systemDesignIssues.add(
+          new AiAnalysisResult.SystemDesignIssue(
+              node.path("title").asText(),
+              node.path("impact").asText(),
+              node.path("detail").asText()));
+    }
+
+    List<AiAnalysisResult.ScalingRisk> scalingRisks = new ArrayList<>();
+    for (JsonNode node : json.path("scalingRisks")) {
+      scalingRisks.add(
+          new AiAnalysisResult.ScalingRisk(
+              node.path("scenario").asText(),
+              node.path("risk").asText(),
+              node.path("mitigation").asText()));
+    }
+
     return new AiAnalysisResult(
         json.path("architectureType").asText(),
         json.path("summary").asText(),
         recommendations,
+        systemDesignIssues,
+        scalingRisks,
         json.path("mermaidDiagram").asText());
   }
 

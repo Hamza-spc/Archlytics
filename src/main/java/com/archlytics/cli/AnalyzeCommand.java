@@ -4,8 +4,11 @@ import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.ai.AiAnalyzer;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphBuilder;
+import com.archlytics.graph.GraphMetrics;
 import com.archlytics.ingest.FileScanner;
 import com.archlytics.ingest.ScannedFile;
+import com.archlytics.report.ArchitectureDiagrams;
+import com.archlytics.report.DiagramGenerator;
 import com.archlytics.report.MarkdownReport;
 import com.archlytics.rules.RuleEngine;
 import com.archlytics.rules.Violation;
@@ -23,7 +26,7 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "archlytics",
     mixinStandardHelpOptions = true,
-    version = "0.1.0",
+    version = "0.2.0",
     description = "Analyze a Java repository and infer its architecture.")
 public class AnalyzeCommand implements Callable<Integer> {
 
@@ -41,7 +44,7 @@ public class AnalyzeCommand implements Callable<Integer> {
 
   @Option(
       names = "--skip-ai",
-      description = "Skip Gemini analysis (graph and rules only)")
+      description = "Skip Gemini analysis (graph, rules, and diagrams only)")
   boolean skipAi;
 
   @Override
@@ -55,29 +58,44 @@ public class AnalyzeCommand implements Callable<Integer> {
 
     List<ScannedFile> files = FileScanner.scan(absoluteRepo);
     DependencyGraph graph = GraphBuilder.build(files);
+    GraphMetrics.Metrics metrics = GraphMetrics.compute(graph);
     List<Violation> violations = RuleEngine.analyze(graph);
+    ArchitectureDiagrams diagrams = DiagramGenerator.generate(graph);
 
     System.out.println("Archlytics — Architecture analysis");
     System.out.println("Repository: " + absoluteRepo);
     System.out.println("Java files: " + files.size());
     System.out.println("Modules: " + graph.modules().size());
     System.out.println("Violations: " + violations.size());
+    System.out.println(
+        "Longest chain: "
+            + (metrics.longestChain().isEmpty()
+                ? "none"
+                : String.join(" → ", metrics.longestChain())));
     System.out.println();
 
+    Path reportPath = outputPath.toAbsolutePath().normalize();
+    String report;
+
     if (skipAi) {
+      report =
+          MarkdownReport.renderWithoutAi(
+              absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams);
+      Files.writeString(reportPath, report);
       printGraphAndViolations(graph, violations);
+      System.out.println();
+      System.out.println("Report written to: " + reportPath);
       return 0;
     }
 
     System.out.println("Calling Gemini for architecture analysis...");
     AiAnalysisResult ai =
-        AiAnalyzer.analyze(absoluteRepo.toString(), graph, violations, files.size());
+        AiAnalyzer.analyze(absoluteRepo.toString(), graph, metrics, violations, files.size());
 
-    String report =
+    report =
         MarkdownReport.render(
-            absoluteRepo.toString(), files.size(), graph, violations, ai);
+            absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams, ai);
 
-    Path reportPath = outputPath.toAbsolutePath().normalize();
     Files.writeString(reportPath, report);
 
     System.out.println();
@@ -87,6 +105,7 @@ public class AnalyzeCommand implements Callable<Integer> {
     System.out.println(ai.summary());
     System.out.println();
     printGraphAndViolations(graph, violations);
+    printSystemDesignHighlights(violations, ai);
     System.out.println();
     System.out.println("Report written to: " + reportPath);
 
@@ -110,6 +129,24 @@ public class AnalyzeCommand implements Callable<Integer> {
         System.out.printf(
             "  [%s] %s — %s%n", violation.severity(), violation.title(), violation.evidence());
       }
+    }
+  }
+
+  private static void printSystemDesignHighlights(
+      List<Violation> violations, AiAnalysisResult ai) {
+    System.out.println();
+    if (!ai.scalingRisks().isEmpty()) {
+      System.out.println("Scaling risks:");
+      for (AiAnalysisResult.ScalingRisk risk : ai.scalingRisks()) {
+        System.out.printf("  %s — %s%n", risk.scenario(), risk.risk());
+      }
+    }
+
+    long designIssues =
+        violations.stream().filter(v -> "system-design".equals(v.rule())).count()
+            + ai.systemDesignIssues().size();
+    if (designIssues > 0) {
+      System.out.println("System design issues found: " + designIssues);
     }
   }
 }

@@ -1,6 +1,7 @@
 package com.archlytics.ai;
 
 import com.archlytics.graph.DependencyGraph;
+import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +12,11 @@ public final class AnalysisPrompt {
   private AnalysisPrompt() {}
 
   public static String build(
-      String repoPath, DependencyGraph graph, List<Violation> violations, int fileCount) {
+      String repoPath,
+      DependencyGraph graph,
+      GraphMetrics.Metrics metrics,
+      List<Violation> violations,
+      int fileCount) {
     StringBuilder prompt = new StringBuilder();
     prompt.append(
         """
@@ -25,6 +30,12 @@ public final class AnalysisPrompt {
           "recommendations": [
             {"title": "short title", "detail": "actionable suggestion"}
           ],
+          "systemDesignIssues": [
+            {"title": "issue name", "impact": "HIGH|MEDIUM|LOW", "detail": "why it matters"}
+          ],
+          "scalingRisks": [
+            {"scenario": "e.g. 10x traffic", "risk": "what breaks", "mitigation": "what to do"}
+          ],
           "mermaidDiagram": "graph TD\\n  moduleA-->moduleB"
         }
 
@@ -34,13 +45,17 @@ public final class AnalysisPrompt {
         - Include all modules and cross-module edges
         - Max 15 lines
 
-        Provide 2-5 recommendations based on violations and structure.
+        Provide:
+        - 2-5 recommendations based on violations and structure
+        - 2-4 systemDesignIssues focused on structural/design problems (bottlenecks, coupling, layering)
+        - 2-3 scalingRisks predicting what fails as load grows (use graph metrics, not runtime data)
         """);
 
     prompt.append("\nRepository: ").append(repoPath).append('\n');
     prompt.append("Java files: ").append(fileCount).append('\n');
-    prompt.append("\nModules:\n");
+    prompt.append("\nGraph metrics:\n").append(GraphMetrics.toSummary(metrics, graph));
 
+    prompt.append("\nModules:\n");
     for (Map.Entry<String, DependencyGraph.ModuleInfo> entry : graph.modules().entrySet()) {
       DependencyGraph.ModuleInfo info = entry.getValue();
       prompt.append("- ")
