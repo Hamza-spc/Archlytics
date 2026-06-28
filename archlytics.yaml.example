@@ -1,0 +1,21 @@
+# Archlytics configuration
+# Copy to archlytics.yaml in the repo you analyze (or pass --config path)
+
+rules:
+  highCoupling:
+    fileImportThreshold: 6      # flag files importing this many internal types
+    moduleFanOutThreshold: 3    # module depends on N+ other modules
+    moduleFanInThreshold: 3     # module used by N+ other modules
+  systemDesign:
+    serialChainThreshold: 3     # longest module chain before violation
+    hubFanInThreshold: 2        # shared-kernel detection (fan-in)
+    entryFanOutThreshold: 2       # entry module depends on N+ backends
+
+ignore:
+  modules: []                   # e.g. legacy-module
+  directories: []               # extra dirs to skip (merged with defaults)
+  pathPatterns: []              # e.g. "**/generated/**"
+
+ai:
+  enabled: true
+  # provider: groq              # optional: groq or gemini (overrides .env)

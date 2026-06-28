@@ -1,5 +1,6 @@
 package com.archlytics.ai;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
@@ -16,7 +17,8 @@ public final class AnalysisPrompt {
       DependencyGraph graph,
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
-      int fileCount) {
+      int fileCount,
+      ArchlyticsConfig config) {
     StringBuilder prompt = new StringBuilder();
     prompt.append(
         """
@@ -53,7 +55,10 @@ public final class AnalysisPrompt {
 
     prompt.append("\nRepository: ").append(repoPath).append('\n');
     prompt.append("Java files: ").append(fileCount).append('\n');
-    prompt.append("\nGraph metrics:\n").append(GraphMetrics.toSummary(metrics, graph));
+    prompt.append("\nGraph metrics:\n")
+        .append(
+            GraphMetrics.toSummary(
+                metrics, graph, config.rules.systemDesign.hubFanInThreshold));
 
     prompt.append("\nModules:\n");
     for (Map.Entry<String, DependencyGraph.ModuleInfo> entry : graph.modules().entrySet()) {

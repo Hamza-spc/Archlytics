@@ -1,5 +1,6 @@
 package com.archlytics.rules;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -15,7 +16,7 @@ public final class CircularDependencyRule implements Rule {
   }
 
   @Override
-  public List<Violation> analyze(DependencyGraph graph) {
+  public List<Violation> analyze(DependencyGraph graph, ArchlyticsConfig config) {
     List<Violation> violations = new ArrayList<>();
     Set<String> reported = new HashSet<>();
 

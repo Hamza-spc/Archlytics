@@ -1,5 +1,6 @@
 package com.archlytics.ai;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.config.EnvLoader;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
@@ -15,14 +16,16 @@ public final class AiAnalyzer {
       DependencyGraph graph,
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
-      int fileCount) {
-    AiProvider provider = AiProvider.resolve();
-    String prompt = AnalysisPrompt.build(repoPath, graph, metrics, violations, fileCount);
+      int fileCount,
+      ArchlyticsConfig config) {
+    AiProvider provider = AiProvider.resolve(config);
+    String prompt =
+        AnalysisPrompt.build(repoPath, graph, metrics, violations, fileCount, config);
     return createClient(provider).analyze(prompt);
   }
 
-  public static AiProvider configuredProvider() {
-    return AiProvider.resolve();
+  public static AiProvider configuredProvider(ArchlyticsConfig config) {
+    return AiProvider.resolve(config);
   }
 
   private static AiClient createClient(AiProvider provider) {

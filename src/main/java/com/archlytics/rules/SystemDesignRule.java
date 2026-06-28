@@ -1,5 +1,6 @@
 package com.archlytics.rules;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import java.util.ArrayList;
@@ -8,17 +9,19 @@ import java.util.Map;
 
 public final class SystemDesignRule implements Rule {
 
-  static final int SERIAL_CHAIN_THRESHOLD = 3;
-
   @Override
   public String name() {
     return "system-design";
   }
 
   @Override
-  public List<Violation> analyze(DependencyGraph graph) {
+  public List<Violation> analyze(DependencyGraph graph, ArchlyticsConfig config) {
+    int serialChainThreshold = config.rules.systemDesign.serialChainThreshold;
+    int hubFanInThreshold = config.rules.systemDesign.hubFanInThreshold;
+    int entryFanOutThreshold = config.rules.systemDesign.entryFanOutThreshold;
+
     List<Violation> violations = new ArrayList<>();
-    GraphMetrics.Metrics metrics = GraphMetrics.compute(graph);
+    GraphMetrics.Metrics metrics = GraphMetrics.compute(graph, hubFanInThreshold);
 
     for (String hub : metrics.hubModules()) {
       int fanIn = graph.modules().get(hub).usedBy().size();
@@ -33,7 +36,7 @@ public final class SystemDesignRule implements Rule {
                   + " modules — under load, this becomes a central scaling bottleneck and single point of contention"));
     }
 
-    if (metrics.longestChain().size() >= SERIAL_CHAIN_THRESHOLD) {
+    if (metrics.longestChain().size() >= serialChainThreshold) {
       violations.add(
           new Violation(
               Severity.MEDIUM,
@@ -56,7 +59,8 @@ public final class SystemDesignRule implements Rule {
     }
 
     for (Map.Entry<String, DependencyGraph.ModuleInfo> entry : graph.modules().entrySet()) {
-      if (entry.getValue().dependsOn().size() >= 2 && entry.getValue().usedBy().isEmpty()) {
+      if (entry.getValue().dependsOn().size() >= entryFanOutThreshold
+          && entry.getValue().usedBy().isEmpty()) {
         violations.add(
             new Violation(
                 Severity.LOW,

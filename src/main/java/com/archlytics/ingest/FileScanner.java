@@ -1,18 +1,23 @@
 package com.archlytics.ingest;
 
+import com.archlytics.config.ArchlyticsConfig;
 import java.io.IOException;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public final class FileScanner {
 
-  private static final Set<String> IGNORED_DIRS =
+  private static final Set<String> DEFAULT_IGNORED_DIRS =
       Set.of(
           ".git",
           ".idea",
@@ -29,6 +34,13 @@ public final class FileScanner {
   private FileScanner() {}
 
   public static List<ScannedFile> scan(Path repoRoot) {
+    return scan(repoRoot, ArchlyticsConfig.defaults());
+  }
+
+  public static List<ScannedFile> scan(Path repoRoot, ArchlyticsConfig config) {
+    Set<String> ignoredDirs = ignoredDirectories(config);
+    Set<String> ignoredModules = new HashSet<>(config.ignore.modules);
+    List<PathMatcher> pathMatchers = pathMatchers(config.ignore.pathPatterns);
     List<ScannedFile> results = new ArrayList<>();
 
     try {
@@ -37,7 +49,7 @@ public final class FileScanner {
           new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-              if (IGNORED_DIRS.contains(dir.getFileName().toString())) {
+              if (ignoredDirs.contains(dir.getFileName().toString())) {
                 return FileVisitResult.SKIP_SUBTREE;
               }
               return FileVisitResult.CONTINUE;
@@ -50,7 +62,15 @@ public final class FileScanner {
               }
 
               Path relative = repoRoot.relativize(file);
+              if (matchesAnyPattern(relative, pathMatchers)) {
+                return FileVisitResult.CONTINUE;
+              }
+
               String module = inferModule(relative);
+              if (ignoredModules.contains(module)) {
+                return FileVisitResult.CONTINUE;
+              }
+
               results.add(new ScannedFile(file, relative, module));
               return FileVisitResult.CONTINUE;
             }
@@ -61,6 +81,26 @@ public final class FileScanner {
 
     results.sort((a, b) -> a.relativePath().compareTo(b.relativePath()));
     return results;
+  }
+
+  static Set<String> ignoredDirectories(ArchlyticsConfig config) {
+    Set<String> ignored = new HashSet<>(DEFAULT_IGNORED_DIRS);
+    ignored.addAll(config.ignore.directories);
+    return ignored;
+  }
+
+  static List<PathMatcher> pathMatchers(List<String> patterns) {
+    FileSystem fileSystem = FileSystems.getDefault();
+    return patterns.stream().map(pattern -> fileSystem.getPathMatcher("glob:" + pattern)).toList();
+  }
+
+  static boolean matchesAnyPattern(Path relativePath, List<PathMatcher> matchers) {
+    for (PathMatcher matcher : matchers) {
+      if (matcher.matches(relativePath)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

@@ -1,5 +1,6 @@
 package com.archlytics.rules;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -9,24 +10,24 @@ import java.util.Set;
 
 public final class HighCouplingRule implements Rule {
 
-  static final int MODULE_FAN_OUT_THRESHOLD = 3;
-  static final int MODULE_FAN_IN_THRESHOLD = 3;
-  static final int FILE_DEPENDENCY_THRESHOLD = 6;
-
   @Override
   public String name() {
     return "high-coupling";
   }
 
   @Override
-  public List<Violation> analyze(DependencyGraph graph) {
+  public List<Violation> analyze(DependencyGraph graph, ArchlyticsConfig config) {
+    int fanOutThreshold = config.rules.highCoupling.moduleFanOutThreshold;
+    int fanInThreshold = config.rules.highCoupling.moduleFanInThreshold;
+    int fileThreshold = config.rules.highCoupling.fileImportThreshold;
+
     List<Violation> violations = new ArrayList<>();
 
     for (Map.Entry<String, DependencyGraph.ModuleInfo> entry : graph.modules().entrySet()) {
       String module = entry.getKey();
       DependencyGraph.ModuleInfo info = entry.getValue();
 
-      if (info.dependsOn().size() >= MODULE_FAN_OUT_THRESHOLD) {
+      if (info.dependsOn().size() >= fanOutThreshold) {
         violations.add(
             new Violation(
                 Severity.MEDIUM,
@@ -36,12 +37,12 @@ public final class HighCouplingRule implements Rule {
                     + " depends on "
                     + info.dependsOn().size()
                     + " modules (threshold: "
-                    + MODULE_FAN_OUT_THRESHOLD
+                    + fanOutThreshold
                     + "): "
                     + String.join(", ", info.dependsOn())));
       }
 
-      if (info.usedBy().size() >= MODULE_FAN_IN_THRESHOLD) {
+      if (info.usedBy().size() >= fanInThreshold) {
         violations.add(
             new Violation(
                 Severity.MEDIUM,
@@ -51,14 +52,14 @@ public final class HighCouplingRule implements Rule {
                     + " is used by "
                     + info.usedBy().size()
                     + " modules (threshold: "
-                    + MODULE_FAN_IN_THRESHOLD
+                    + fanInThreshold
                     + "): "
                     + String.join(", ", info.usedBy())));
       }
     }
 
     for (Map.Entry<Path, Set<Path>> entry : graph.fileDependencies().entrySet()) {
-      if (entry.getValue().size() >= FILE_DEPENDENCY_THRESHOLD) {
+      if (entry.getValue().size() >= fileThreshold) {
         violations.add(
             new Violation(
                 Severity.LOW,
@@ -68,7 +69,7 @@ public final class HighCouplingRule implements Rule {
                     + " imports "
                     + entry.getValue().size()
                     + " internal types (threshold: "
-                    + FILE_DEPENDENCY_THRESHOLD
+                    + fileThreshold
                     + ")"));
       }
     }

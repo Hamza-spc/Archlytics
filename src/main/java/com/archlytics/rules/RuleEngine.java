@@ -1,5 +1,6 @@
 package com.archlytics.rules;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -13,9 +14,13 @@ public final class RuleEngine {
   private RuleEngine() {}
 
   public static List<Violation> analyze(DependencyGraph graph) {
+    return analyze(graph, ArchlyticsConfig.defaults());
+  }
+
+  public static List<Violation> analyze(DependencyGraph graph, ArchlyticsConfig config) {
     List<Violation> violations = new ArrayList<>();
     for (Rule rule : RULES) {
-      violations.addAll(rule.analyze(graph));
+      violations.addAll(rule.analyze(graph, config));
     }
 
     violations.sort(

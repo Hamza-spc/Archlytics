@@ -14,11 +14,15 @@ public final class GraphMetrics {
   private GraphMetrics() {}
 
   public static Metrics compute(DependencyGraph graph) {
+    return compute(graph, 2);
+  }
+
+  public static Metrics compute(DependencyGraph graph, int hubFanInThreshold) {
     Map<String, Set<String>> edges = graph.moduleDependencies();
     Set<String> allModules = graph.modules().keySet();
 
     List<String> longestChain = longestDependencyChain(allModules, edges);
-    List<String> hubs = findHubModules(graph);
+    List<String> hubs = findHubModules(graph, hubFanInThreshold);
     List<String> entryPoints = findEntryPoints(graph);
 
     return new Metrics(longestChain, hubs, entryPoints);
@@ -34,8 +38,12 @@ public final class GraphMetrics {
   }
 
   public static List<String> findHubModules(DependencyGraph graph) {
+    return findHubModules(graph, 2);
+  }
+
+  public static List<String> findHubModules(DependencyGraph graph, int hubFanInThreshold) {
     return graph.modules().entrySet().stream()
-        .filter(e -> e.getValue().usedBy().size() >= 2)
+        .filter(e -> e.getValue().usedBy().size() >= hubFanInThreshold)
         .sorted(Comparator.comparingInt((Map.Entry<String, DependencyGraph.ModuleInfo> e) -> -e.getValue().usedBy().size())
             .thenComparing(Map.Entry::getKey))
         .map(Map.Entry::getKey)
@@ -70,6 +78,10 @@ public final class GraphMetrics {
   }
 
   public static String toSummary(Metrics metrics, DependencyGraph graph) {
+    return toSummary(metrics, graph, 2);
+  }
+
+  public static String toSummary(Metrics metrics, DependencyGraph graph, int hubFanInThreshold) {
     StringBuilder sb = new StringBuilder();
     sb.append("Longest dependency chain: ")
         .append(metrics.longestChain().isEmpty() ? "none" : String.join(" → ", metrics.longestChain()))
@@ -77,7 +89,9 @@ public final class GraphMetrics {
     sb.append("Entry-point modules: ")
         .append(metrics.entryPoints().isEmpty() ? "none" : String.join(", ", metrics.entryPoints()))
         .append('\n');
-    sb.append("Shared-kernel hubs (fan-in ≥ 2): ")
+    sb.append("Shared-kernel hubs (fan-in ≥ ")
+        .append(hubFanInThreshold)
+        .append("): ")
         .append(metrics.hubModules().isEmpty() ? "none" : String.join(", ", metrics.hubModules()))
         .append('\n');
 

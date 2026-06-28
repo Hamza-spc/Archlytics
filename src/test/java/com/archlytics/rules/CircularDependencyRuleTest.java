@@ -3,6 +3,7 @@ package com.archlytics.rules;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -22,7 +23,8 @@ class CircularDependencyRuleTest {
     edges.put("c", Set.of("a"));
 
     DependencyGraph graph = graphWithModules("a", "b", "c", edges);
-    List<Violation> violations = new CircularDependencyRule().analyze(graph);
+    List<Violation> violations =
+        new CircularDependencyRule().analyze(graph, ArchlyticsConfig.defaults());
 
     assertEquals(1, violations.size());
     assertTrue(violations.get(0).evidence().contains("a → b → c → a"));

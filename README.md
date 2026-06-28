@@ -106,7 +106,37 @@ java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --skip-ai
 
 ## Configuration
 
-Create a `.env` file in the project root (never commit it):
+Create `archlytics.yaml` in the repo you analyze (or pass `--config path/to/archlytics.yaml`):
+
+```yaml
+rules:
+  highCoupling:
+    fileImportThreshold: 6
+    moduleFanOutThreshold: 3
+    moduleFanInThreshold: 3
+  systemDesign:
+    serialChainThreshold: 3
+    hubFanInThreshold: 2
+    entryFanOutThreshold: 2
+
+ignore:
+  modules:
+    - legacy-module
+  directories:
+    - generated-sources
+  pathPatterns:
+    - "**/generated/**"
+
+ai:
+  enabled: true
+  provider: groq   # optional: groq or gemini
+```
+
+See [archlytics.yaml.example](archlytics.yaml.example) for all options.
+
+### Environment variables (AI keys)
+
+Create a `.env` file in the Archlytics project root (never commit it):
 
 ```env
 AI_PROVIDER=groq

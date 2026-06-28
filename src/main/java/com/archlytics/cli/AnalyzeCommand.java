@@ -2,6 +2,8 @@ package com.archlytics.cli;
 
 import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.ai.AiAnalyzer;
+import com.archlytics.config.ArchlyticsConfig;
+import com.archlytics.config.ConfigLoader;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphBuilder;
 import com.archlytics.graph.GraphMetrics;
@@ -17,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
@@ -26,7 +29,7 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "archlytics",
     mixinStandardHelpOptions = true,
-    version = "0.2.0",
+    version = "0.3.0",
     description = "Analyze a Java repository and infer its architecture.")
 public class AnalyzeCommand implements Callable<Integer> {
 
@@ -43,8 +46,13 @@ public class AnalyzeCommand implements Callable<Integer> {
   Path outputPath;
 
   @Option(
+      names = "--config",
+      description = "Path to archlytics.yaml (default: <repo>/archlytics.yaml)")
+  Path configPath;
+
+  @Option(
       names = "--skip-ai",
-      description = "Skip Gemini analysis (graph, rules, and diagrams only)")
+      description = "Skip AI analysis (graph, rules, and diagrams only)")
   boolean skipAi;
 
   @Override
@@ -56,14 +64,19 @@ public class AnalyzeCommand implements Callable<Integer> {
       return 1;
     }
 
-    List<ScannedFile> files = FileScanner.scan(absoluteRepo);
+    ArchlyticsConfig config = ConfigLoader.load(absoluteRepo, configPath);
+    boolean runAi = config.ai.enabled && !skipAi;
+
+    List<ScannedFile> files = FileScanner.scan(absoluteRepo, config);
     DependencyGraph graph = GraphBuilder.build(files);
-    GraphMetrics.Metrics metrics = GraphMetrics.compute(graph);
-    List<Violation> violations = RuleEngine.analyze(graph);
+    GraphMetrics.Metrics metrics =
+        GraphMetrics.compute(graph, config.rules.systemDesign.hubFanInThreshold);
+    List<Violation> violations = RuleEngine.analyze(graph, config);
     ArchitectureDiagrams diagrams = DiagramGenerator.generate(graph);
 
     System.out.println("Archlytics — Architecture analysis");
     System.out.println("Repository: " + absoluteRepo);
+    printConfigSource(absoluteRepo, configPath);
     System.out.println("Java files: " + files.size());
     System.out.println("Modules: " + graph.modules().size());
     System.out.println("Violations: " + violations.size());
@@ -77,7 +90,7 @@ public class AnalyzeCommand implements Callable<Integer> {
     Path reportPath = outputPath.toAbsolutePath().normalize();
     String report;
 
-    if (skipAi) {
+    if (!runAi) {
       report =
           MarkdownReport.renderWithoutAi(
               absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams);
@@ -89,9 +102,10 @@ public class AnalyzeCommand implements Callable<Integer> {
     }
 
     System.out.println(
-        "Calling AI (" + AiAnalyzer.configuredProvider().name().toLowerCase() + ")...");
+        "Calling AI (" + AiAnalyzer.configuredProvider(config).name().toLowerCase() + ")...");
     AiAnalysisResult ai =
-        AiAnalyzer.analyze(absoluteRepo.toString(), graph, metrics, violations, files.size());
+        AiAnalyzer.analyze(
+            absoluteRepo.toString(), graph, metrics, violations, files.size(), config);
 
     report =
         MarkdownReport.render(
@@ -111,6 +125,15 @@ public class AnalyzeCommand implements Callable<Integer> {
     System.out.println("Report written to: " + reportPath);
 
     return 0;
+  }
+
+  private static void printConfigSource(Path repoRoot, Path explicitConfig) {
+    Optional<Path> configFile = ConfigLoader.resolveConfigFile(repoRoot, explicitConfig);
+    if (configFile.isPresent()) {
+      System.out.println("Config: " + configFile.get());
+    } else {
+      System.out.println("Config: defaults (no archlytics.yaml found)");
+    }
   }
 
   private static void printGraphAndViolations(DependencyGraph graph, List<Violation> violations) {

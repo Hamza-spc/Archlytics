@@ -2,6 +2,7 @@ package com.archlytics.ai;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
@@ -37,7 +38,8 @@ class AnalysisPromptTest {
                     "high-coupling",
                     "File has many internal dependencies",
                     "Controller.java imports 8 types")),
-            28);
+            28,
+            ArchlyticsConfig.defaults());
 
     assertTrue(prompt.contains("maroctax-api"));
     assertTrue(prompt.contains("Longest dependency chain"));

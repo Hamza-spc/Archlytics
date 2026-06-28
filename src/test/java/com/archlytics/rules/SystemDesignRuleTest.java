@@ -2,6 +2,7 @@ package com.archlytics.rules;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.archlytics.config.ArchlyticsConfig;
 import com.archlytics.graph.DependencyGraph;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,8 @@ class SystemDesignRuleTest {
                     new DependencyGraph.ModuleInfo(
                         14, Set.of(), Set.of("maroctax-api", "maroctax-spring-boot-starter"))));
 
-    List<Violation> violations = new SystemDesignRule().analyze(graph);
+    List<Violation> violations =
+        new SystemDesignRule().analyze(graph, ArchlyticsConfig.defaults());
 
     assertTrue(
         violations.stream().anyMatch(v -> v.title().contains("Shared kernel bottleneck")));
