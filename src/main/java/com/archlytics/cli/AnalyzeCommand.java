@@ -16,6 +16,7 @@ import com.archlytics.report.HealthScoreCalculator;
 import com.archlytics.report.HtmlReport;
 import com.archlytics.report.MarkdownReport;
 import com.archlytics.report.ReportFormat;
+import com.archlytics.report.PrCommentFormatter;
 import com.archlytics.report.ReportWriter;
 import com.archlytics.rules.RuleEngine;
 import com.archlytics.rules.Violation;
@@ -42,7 +43,7 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "archlytics",
     mixinStandardHelpOptions = true,
-    version = "0.6.0",
+    version = "0.7.0",
     description = "Analyze a Java repository and infer its architecture.")
 public class AnalyzeCommand implements Callable<Integer> {
 
@@ -97,6 +98,16 @@ public class AnalyzeCommand implements Callable<Integer> {
       names = "--head",
       description = "PR analysis: head git ref (default: HEAD)")
   String headRef;
+
+  @Option(
+      names = "--fail-on",
+      description = "Exit with code 1 if violations at/above severity (none, low, medium, high)")
+  String failOn;
+
+  @Option(
+      names = "--pr-comment",
+      description = "Write GitHub PR comment markdown to this path (requires --base)")
+  Path prCommentPath;
 
   @Override
   public Integer call() throws IOException {
@@ -231,6 +242,28 @@ public class AnalyzeCommand implements Callable<Integer> {
     System.out.println();
     for (Path path : writtenReports) {
       System.out.println("Report written to: " + path);
+    }
+
+    if (prCommentPath != null && pullRequestAnalysis != null) {
+      String comment = PrCommentFormatter.render(healthScore, pullRequestAnalysis);
+      Files.writeString(prCommentPath.toAbsolutePath().normalize(), comment);
+      System.out.println("PR comment written to: " + prCommentPath.toAbsolutePath().normalize());
+    } else if (prCommentPath != null) {
+      System.err.println("Warning: --pr-comment requires --base (PR analysis was not run)");
+    }
+
+    List<Violation> gateViolations =
+        pullRequestAnalysis != null
+            ? pullRequestAnalysis.introducedViolations()
+            : violations;
+    if (ViolationGate.shouldFail(gateViolations, failOn)) {
+      System.err.println(
+          "Failing due to --fail-on "
+              + failOn
+              + " ("
+              + gateViolations.size()
+              + " violation(s) checked)");
+      return 1;
     }
 
     return 0;

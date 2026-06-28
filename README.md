@@ -209,6 +209,55 @@ java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --base origin/main --he
 
 Reports include changed files/modules, new module dependencies, and violations introduced compared to base.
 
+## GitHub Action
+
+Run Archlytics on every pull request and post a summary comment:
+
+```yaml
+# .github/workflows/archlytics.yml
+name: Archlytics
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: Hamza-spc/Archlytics/action@main
+        with:
+          fail-on: high        # fail check if PR introduces HIGH violations
+          skip-ai: true        # no API key needed
+          # groq-api-key: ${{ secrets.GROQ_API_KEY }}  # optional AI
+```
+
+The action builds Archlytics, compares the PR against its base branch, uploads a report artifact, and updates a PR comment (idempotent — one comment per PR).
+
+### CI exit codes
+
+Use `--fail-on` locally or in custom CI:
+
+```bash
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --fail-on high --skip-ai
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --base origin/main --fail-on medium --pr-comment comment.md
+```
+
+| `--fail-on` | Fails when |
+|-------------|------------|
+| `none` | Never (report only) |
+| `high` | Any HIGH violation |
+| `medium` | MEDIUM or HIGH |
+| `low` | Any violation |
+
+With `--base`, only **introduced** PR violations are checked. Without `--base`, all current violations are checked.
+
 ## What it detects
 
 ### Deterministic rules (no AI)
@@ -238,8 +287,14 @@ src/main/java/com/archlytics/
 ├── graph/         # Import parser, dependency graph, metrics
 ├── rules/         # Violation detection engine
 ├── report/        # Mermaid diagrams + markdown report
+├── git/           # Git revision scanning for PR analysis
+├── pr/            # Pull request diff analysis
+├── snapshot/      # Run snapshots and drift comparison
 ├── ai/            # Groq / Gemini clients
 └── config/        # .env loader
+
+action/            # GitHub Action (composite)
+.github/workflows/ # CI for this repo
 ```
 
 ---
