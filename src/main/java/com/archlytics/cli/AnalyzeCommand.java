@@ -88,7 +88,8 @@ public class AnalyzeCommand implements Callable<Integer> {
       return 0;
     }
 
-    System.out.println("Calling Gemini for architecture analysis...");
+    System.out.println(
+        "Calling AI (" + AiAnalyzer.configuredProvider().name().toLowerCase() + ")...");
     AiAnalysisResult ai =
         AiAnalyzer.analyze(absoluteRepo.toString(), graph, metrics, violations, files.size());
 

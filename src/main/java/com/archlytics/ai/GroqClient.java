@@ -11,20 +11,17 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-public final class GeminiClient implements AiClient {
+public final class GroqClient implements AiClient {
 
-  private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+  private static final String ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+  private static final String DEFAULT_MODEL = "llama-3.3-70b-versatile";
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private final String apiKey;
   private final String model;
   private final HttpClient httpClient;
 
-  public GeminiClient(String apiKey) {
-    this(apiKey, DEFAULT_MODEL);
-  }
-
-  public GeminiClient(String apiKey, String model) {
+  public GroqClient(String apiKey, String model) {
     this.apiKey = apiKey;
     this.model = model != null && !model.isBlank() ? model : DEFAULT_MODEL;
     this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
@@ -36,13 +33,9 @@ public final class GeminiClient implements AiClient {
       String requestBody = buildRequestBody(prompt);
       HttpRequest request =
           HttpRequest.newBuilder()
-              .uri(
-                  URI.create(
-                      "https://generativelanguage.googleapis.com/v1beta/models/"
-                          + model
-                          + ":generateContent?key="
-                          + apiKey))
+              .uri(URI.create(ENDPOINT))
               .header("Content-Type", "application/json")
+              .header("Authorization", "Bearer " + apiKey)
               .timeout(Duration.ofSeconds(60))
               .POST(HttpRequest.BodyPublishers.ofString(requestBody))
               .build();
@@ -52,7 +45,7 @@ public final class GeminiClient implements AiClient {
 
       if (response.statusCode() != 200) {
         throw new IllegalStateException(
-            "Gemini API error (HTTP "
+            "Groq API error (HTTP "
                 + response.statusCode()
                 + "): "
                 + truncate(response.body(), 500));
@@ -61,35 +54,38 @@ public final class GeminiClient implements AiClient {
       return parseResponse(response.body());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Gemini request interrupted", e);
+      throw new IllegalStateException("Groq request interrupted", e);
     } catch (IOException e) {
-      throw new IllegalStateException("Gemini request failed", e);
+      throw new IllegalStateException("Groq request failed", e);
     }
   }
 
-  private static String buildRequestBody(String prompt) throws IOException {
+  private String buildRequestBody(String prompt) throws IOException {
     Map<String, Object> body =
         Map.of(
-            "contents",
-            List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-            "generationConfig",
-            Map.of("responseMimeType", "application/json"));
+            "model",
+            model,
+            "messages",
+            List.of(
+                Map.of(
+                    "role",
+                    "system",
+                    "content",
+                    "You are a software architect. Respond with valid JSON only, no markdown."),
+                Map.of("role", "user", "content", prompt)),
+            "response_format",
+            Map.of("type", "json_object"),
+            "temperature",
+            0.2);
     return MAPPER.writeValueAsString(body);
   }
 
   private static AiAnalysisResult parseResponse(String responseBody) throws IOException {
     JsonNode root = MAPPER.readTree(responseBody);
-    String text =
-        root.path("candidates")
-            .path(0)
-            .path("content")
-            .path("parts")
-            .path(0)
-            .path("text")
-            .asText();
+    String text = root.path("choices").path(0).path("message").path("content").asText();
 
     if (text == null || text.isBlank()) {
-      throw new IllegalStateException("Empty response from Gemini: " + truncate(responseBody, 300));
+      throw new IllegalStateException("Empty response from Groq: " + truncate(responseBody, 300));
     }
 
     return AiResponseParser.parse(text);

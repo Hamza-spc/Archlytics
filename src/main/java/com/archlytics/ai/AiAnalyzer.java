@@ -16,15 +16,37 @@ public final class AiAnalyzer {
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
       int fileCount) {
-    String apiKey =
-        EnvLoader.get("GEMINI_API_KEY")
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "GEMINI_API_KEY not found. Set it in .env or as an environment variable."));
-
-    String model = EnvLoader.get("GEMINI_MODEL").orElse(null);
+    AiProvider provider = AiProvider.resolve();
     String prompt = AnalysisPrompt.build(repoPath, graph, metrics, violations, fileCount);
-    return new GeminiClient(apiKey, model).analyze(prompt);
+    return createClient(provider).analyze(prompt);
+  }
+
+  public static AiProvider configuredProvider() {
+    return AiProvider.resolve();
+  }
+
+  private static AiClient createClient(AiProvider provider) {
+    return switch (provider) {
+      case GROQ -> {
+        String apiKey =
+            EnvLoader.get("GROQ_API_KEY")
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "GROQ_API_KEY not found. Get a free key at https://console.groq.com"));
+        String model = EnvLoader.get("GROQ_MODEL").orElse(null);
+        yield new GroqClient(apiKey, model);
+      }
+      case GEMINI -> {
+        String apiKey =
+            EnvLoader.get("GEMINI_API_KEY")
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "GEMINI_API_KEY not found. Set it in .env or as an environment variable."));
+        String model = EnvLoader.get("GEMINI_MODEL").orElse(null);
+        yield new GeminiClient(apiKey, model);
+      }
+    };
   }
 }
