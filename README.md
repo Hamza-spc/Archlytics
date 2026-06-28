@@ -98,6 +98,12 @@ Output is written to `archlytics-report.md` in the current directory. Every repo
 # Custom report path
 java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo -o report.md
 
+# HTML report (styled, Mermaid diagrams, print-to-PDF button)
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --format html
+
+# Both markdown and HTML
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --format both
+
 # Skip AI — graph, rules, and diagrams only (no API key needed)
 java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --skip-ai
 ```

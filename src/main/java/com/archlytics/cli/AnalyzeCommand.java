@@ -13,12 +13,16 @@ import com.archlytics.report.ArchitectureDiagrams;
 import com.archlytics.report.DiagramGenerator;
 import com.archlytics.report.HealthScore;
 import com.archlytics.report.HealthScoreCalculator;
+import com.archlytics.report.HtmlReport;
 import com.archlytics.report.MarkdownReport;
+import com.archlytics.report.ReportFormat;
+import com.archlytics.report.ReportWriter;
 import com.archlytics.rules.RuleEngine;
 import com.archlytics.rules.Violation;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,7 +35,7 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "archlytics",
     mixinStandardHelpOptions = true,
-    version = "0.3.0",
+    version = "0.4.0",
     description = "Analyze a Java repository and infer its architecture.")
 public class AnalyzeCommand implements Callable<Integer> {
 
@@ -43,9 +47,15 @@ public class AnalyzeCommand implements Callable<Integer> {
 
   @Option(
       names = {"-o", "--output"},
-      description = "Markdown report output path",
+      description = "Report output path (default: archlytics-report.md or .html by format)",
       defaultValue = "archlytics-report.md")
   Path outputPath;
+
+  @Option(
+      names = {"-f", "--format"},
+      description = "Report format: md, html, or both",
+      defaultValue = "md")
+  String format;
 
   @Option(
       names = "--config",
@@ -60,6 +70,7 @@ public class AnalyzeCommand implements Callable<Integer> {
   @Override
   public Integer call() throws IOException {
     Path absoluteRepo = repoPath.toAbsolutePath().normalize();
+    ReportFormat reportFormat = ReportFormat.fromString(format);
 
     if (!Files.isDirectory(absoluteRepo)) {
       System.err.println("Error: not a directory — " + absoluteRepo);
@@ -91,44 +102,77 @@ public class AnalyzeCommand implements Callable<Integer> {
                 : String.join(" → ", metrics.longestChain())));
     System.out.println();
 
-    Path reportPath = outputPath.toAbsolutePath().normalize();
-    String report;
-
-    if (!runAi) {
-      report =
-          MarkdownReport.renderWithoutAi(
-              absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams, healthScore);
-      Files.writeString(reportPath, report);
-      printGraphAndViolations(graph, violations);
-      System.out.println();
-      System.out.println("Report written to: " + reportPath);
-      return 0;
+    AiAnalysisResult ai = null;
+    if (runAi) {
+      System.out.println(
+          "Calling AI (" + AiAnalyzer.configuredProvider(config).name().toLowerCase() + ")...");
+      ai =
+          AiAnalyzer.analyze(
+              absoluteRepo.toString(), graph, metrics, violations, files.size(), config);
     }
 
-    System.out.println(
-        "Calling AI (" + AiAnalyzer.configuredProvider(config).name().toLowerCase() + ")...");
-    AiAnalysisResult ai =
-        AiAnalyzer.analyze(
-            absoluteRepo.toString(), graph, metrics, violations, files.size(), config);
+    List<Path> writtenReports = writeReports(absoluteRepo, files.size(), graph, metrics, violations, diagrams, healthScore, ai, runAi, reportFormat);
 
-    report =
-        MarkdownReport.render(
-            absoluteRepo.toString(), files.size(), graph, metrics, violations, diagrams, healthScore, ai);
+    if (ai != null) {
+      System.out.println();
+      System.out.println("Architecture type: " + ai.architectureType());
+      System.out.println();
+      System.out.println("Summary:");
+      System.out.println(ai.summary());
+    }
 
-    Files.writeString(reportPath, report);
-
-    System.out.println();
-    System.out.println("Architecture type: " + ai.architectureType());
-    System.out.println();
-    System.out.println("Summary:");
-    System.out.println(ai.summary());
     System.out.println();
     printGraphAndViolations(graph, violations);
-    printSystemDesignHighlights(violations, ai);
+    if (ai != null) {
+      printSystemDesignHighlights(violations, ai);
+    }
     System.out.println();
-    System.out.println("Report written to: " + reportPath);
+    for (Path path : writtenReports) {
+      System.out.println("Report written to: " + path);
+    }
 
     return 0;
+  }
+
+  private List<Path> writeReports(
+      Path absoluteRepo,
+      int fileCount,
+      DependencyGraph graph,
+      GraphMetrics.Metrics metrics,
+      List<Violation> violations,
+      ArchitectureDiagrams diagrams,
+      HealthScore healthScore,
+      AiAnalysisResult ai,
+      boolean runAi,
+      ReportFormat reportFormat)
+      throws IOException {
+    List<Path> written = new ArrayList<>();
+    Path mdPath = outputPath.toAbsolutePath().normalize();
+    Path htmlPath = ReportWriter.htmlPathFor(mdPath);
+
+    if (reportFormat == ReportFormat.MD || reportFormat == ReportFormat.BOTH) {
+      String markdown =
+          runAi
+              ? MarkdownReport.render(
+                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore, ai)
+              : MarkdownReport.renderWithoutAi(
+                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore);
+      Files.writeString(mdPath, markdown);
+      written.add(mdPath);
+    }
+
+    if (reportFormat == ReportFormat.HTML || reportFormat == ReportFormat.BOTH) {
+      String html =
+          runAi
+              ? HtmlReport.render(
+                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore, ai)
+              : HtmlReport.renderWithoutAi(
+                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore);
+      Files.writeString(htmlPath, html);
+      written.add(htmlPath);
+    }
+
+    return written;
   }
 
   private static void printConfigSource(Path repoRoot, Path explicitConfig) {
