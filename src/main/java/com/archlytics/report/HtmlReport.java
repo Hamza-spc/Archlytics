@@ -4,6 +4,7 @@ import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
+import com.archlytics.snapshot.RunComparison;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -22,9 +23,10 @@ public final class HtmlReport {
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
+      RunComparison comparison,
       AiAnalysisResult ai) {
     return renderInternal(
-        repoPath, fileCount, graph, metrics, violations, diagrams, healthScore, ai, false);
+        repoPath, fileCount, graph, metrics, violations, diagrams, healthScore, comparison, ai, false);
   }
 
   public static String renderWithoutAi(
@@ -34,9 +36,10 @@ public final class HtmlReport {
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
-      HealthScore healthScore) {
+      HealthScore healthScore,
+      RunComparison comparison) {
     return renderInternal(
-        repoPath, fileCount, graph, metrics, violations, diagrams, healthScore, null, true);
+        repoPath, fileCount, graph, metrics, violations, diagrams, healthScore, comparison, null, true);
   }
 
   private static String renderInternal(
@@ -47,6 +50,7 @@ public final class HtmlReport {
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
+      RunComparison comparison,
       AiAnalysisResult ai,
       boolean skipAi) {
     String generated =
@@ -72,6 +76,7 @@ public final class HtmlReport {
     html.append("</header>\n");
 
     appendHealthDashboard(html, healthScore, fileCount, graph.modules().size(), violations.size());
+    appendComparison(html, comparison);
 
     if (skipAi) {
       html.append("<section class=\"card notice\"><p>AI analysis skipped. Deterministic analysis only.</p></section>\n");
@@ -125,6 +130,40 @@ public final class HtmlReport {
         html.append("<li>").append(escape(risk)).append("</li>\n");
       }
       html.append("</ol></div>\n");
+    }
+
+    html.append("</section>\n");
+  }
+
+  private static void appendComparison(StringBuilder html, RunComparison comparison) {
+    if (comparison == null) {
+      return;
+    }
+
+    html.append("<section class=\"card drift\">\n<h2>Architecture Drift</h2>\n");
+    html.append("<p><strong>Health score:</strong> ").append(escape(comparison.scoreSummary())).append("</p>\n");
+    html.append("<p class=\"meta\">Baseline captured: ")
+        .append(escape(comparison.baseline().capturedAt()))
+        .append("</p>\n");
+
+    if (!comparison.newViolations().isEmpty()) {
+      html.append("<h3>New violations</h3><ul>\n");
+      for (var violation : comparison.newViolations()) {
+        html.append("<li>").append(escape(violation.toString())).append("</li>\n");
+      }
+      html.append("</ul>\n");
+    }
+
+    if (!comparison.resolvedViolations().isEmpty()) {
+      html.append("<h3>Resolved violations</h3><ul>\n");
+      for (var violation : comparison.resolvedViolations()) {
+        html.append("<li>").append(escape(violation.toString())).append("</li>\n");
+      }
+      html.append("</ul>\n");
+    }
+
+    if (comparison.newViolations().isEmpty() && comparison.resolvedViolations().isEmpty()) {
+      html.append("<p class=\"muted\">No violation changes since baseline.</p>\n");
     }
 
     html.append("</section>\n");
@@ -412,6 +451,7 @@ public final class HtmlReport {
           padding: 1.25rem 1.5rem;
           margin-bottom: 1.25rem;
         }
+        .drift { border-color: var(--accent); }
         .notice { border-color: var(--warning); }
         .architecture-type {
           font-weight: 600;

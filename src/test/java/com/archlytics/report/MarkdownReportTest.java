@@ -53,7 +53,7 @@ class MarkdownReportTest {
             "graph TD\n  api-->core");
 
     String report =
-        MarkdownReport.render("/repo", 8, graph, metrics, violations, diagrams, healthScore, ai);
+        MarkdownReport.render("/repo", 8, graph, metrics, violations, diagrams, healthScore, null, ai);
 
     assertTrue(report.contains("## Architecture Health"));
     assertTrue(report.contains("/100"));

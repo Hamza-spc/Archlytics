@@ -19,9 +19,15 @@ import com.archlytics.report.ReportFormat;
 import com.archlytics.report.ReportWriter;
 import com.archlytics.rules.RuleEngine;
 import com.archlytics.rules.Violation;
+import com.archlytics.snapshot.RunComparison;
+import com.archlytics.snapshot.RunSnapshot;
+import com.archlytics.snapshot.SnapshotComparer;
+import com.archlytics.snapshot.SnapshotStore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +41,12 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "archlytics",
     mixinStandardHelpOptions = true,
-    version = "0.4.0",
+    version = "0.5.0",
     description = "Analyze a Java repository and infer its architecture.")
 public class AnalyzeCommand implements Callable<Integer> {
+
+  private static final DateTimeFormatter CAPTURED_AT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   @Parameters(
       index = "0",
@@ -67,6 +76,17 @@ public class AnalyzeCommand implements Callable<Integer> {
       description = "Skip AI analysis (graph, rules, and diagrams only)")
   boolean skipAi;
 
+  @Option(
+      names = "--save-snapshot",
+      description = "Save analysis snapshot to <repo>/.archlytics/snapshots/")
+  boolean saveSnapshot;
+
+  @Option(
+      names = "--compare",
+      description = "Compare with a snapshot file, or 'latest' for the most recent snapshot",
+      paramLabel = "SNAPSHOT")
+  String compareTarget;
+
   @Override
   public Integer call() throws IOException {
     Path absoluteRepo = repoPath.toAbsolutePath().normalize();
@@ -88,10 +108,36 @@ public class AnalyzeCommand implements Callable<Integer> {
     ArchitectureDiagrams diagrams = DiagramGenerator.generate(graph);
     HealthScore healthScore = HealthScoreCalculator.calculate(violations, metrics, config);
 
+    RunSnapshot currentSnapshot =
+        RunSnapshot.capture(
+            absoluteRepo.toString(),
+            files.size(),
+            graph,
+            metrics,
+            healthScore,
+            violations,
+            CAPTURED_AT.format(LocalDateTime.now()));
+
+    RunComparison comparison = null;
+    if (compareTarget != null) {
+      Path baselinePath = SnapshotStore.resolveCompareTarget(absoluteRepo, compareTarget);
+      RunSnapshot baseline = SnapshotStore.load(baselinePath);
+      comparison = SnapshotComparer.compare(baseline, currentSnapshot);
+    }
+
     System.out.println("Archlytics — Architecture analysis");
     System.out.println("Repository: " + absoluteRepo);
     printConfigSource(absoluteRepo, configPath);
     System.out.println("Architecture health: " + healthScore.score() + "/100 — " + healthScore.label());
+    if (comparison != null) {
+      System.out.println("Health drift: " + comparison.scoreSummary());
+      System.out.println(
+          "Changes: +"
+              + comparison.newViolations().size()
+              + " new, -"
+              + comparison.resolvedViolations().size()
+              + " resolved");
+    }
     System.out.println("Java files: " + files.size());
     System.out.println("Modules: " + graph.modules().size());
     System.out.println("Violations: " + violations.size());
@@ -111,7 +157,24 @@ public class AnalyzeCommand implements Callable<Integer> {
               absoluteRepo.toString(), graph, metrics, violations, files.size(), config);
     }
 
-    List<Path> writtenReports = writeReports(absoluteRepo, files.size(), graph, metrics, violations, diagrams, healthScore, ai, runAi, reportFormat);
+    List<Path> writtenReports =
+        writeReports(
+            absoluteRepo,
+            files.size(),
+            graph,
+            metrics,
+            violations,
+            diagrams,
+            healthScore,
+            comparison,
+            ai,
+            runAi,
+            reportFormat);
+
+    if (saveSnapshot) {
+      Path snapshotPath = SnapshotStore.save(absoluteRepo, currentSnapshot);
+      System.out.println("Snapshot saved to: " + snapshotPath);
+    }
 
     if (ai != null) {
       System.out.println();
@@ -123,6 +186,9 @@ public class AnalyzeCommand implements Callable<Integer> {
 
     System.out.println();
     printGraphAndViolations(graph, violations);
+    if (comparison != null) {
+      printComparisonDetails(comparison);
+    }
     if (ai != null) {
       printSystemDesignHighlights(violations, ai);
     }
@@ -142,6 +208,7 @@ public class AnalyzeCommand implements Callable<Integer> {
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
+      RunComparison comparison,
       AiAnalysisResult ai,
       boolean runAi,
       ReportFormat reportFormat)
@@ -154,9 +221,24 @@ public class AnalyzeCommand implements Callable<Integer> {
       String markdown =
           runAi
               ? MarkdownReport.render(
-                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore, ai)
+                  absoluteRepo.toString(),
+                  fileCount,
+                  graph,
+                  metrics,
+                  violations,
+                  diagrams,
+                  healthScore,
+                  comparison,
+                  ai)
               : MarkdownReport.renderWithoutAi(
-                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore);
+                  absoluteRepo.toString(),
+                  fileCount,
+                  graph,
+                  metrics,
+                  violations,
+                  diagrams,
+                  healthScore,
+                  comparison);
       Files.writeString(mdPath, markdown);
       written.add(mdPath);
     }
@@ -165,9 +247,24 @@ public class AnalyzeCommand implements Callable<Integer> {
       String html =
           runAi
               ? HtmlReport.render(
-                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore, ai)
+                  absoluteRepo.toString(),
+                  fileCount,
+                  graph,
+                  metrics,
+                  violations,
+                  diagrams,
+                  healthScore,
+                  comparison,
+                  ai)
               : HtmlReport.renderWithoutAi(
-                  absoluteRepo.toString(), fileCount, graph, metrics, violations, diagrams, healthScore);
+                  absoluteRepo.toString(),
+                  fileCount,
+                  graph,
+                  metrics,
+                  violations,
+                  diagrams,
+                  healthScore,
+                  comparison);
       Files.writeString(htmlPath, html);
       written.add(htmlPath);
     }
@@ -201,6 +298,18 @@ public class AnalyzeCommand implements Callable<Integer> {
         System.out.printf(
             "  [%s] %s — %s%n", violation.severity(), violation.title(), violation.evidence());
       }
+    }
+  }
+
+  private static void printComparisonDetails(RunComparison comparison) {
+    System.out.println();
+    if (!comparison.newViolations().isEmpty()) {
+      System.out.println("New violations:");
+      comparison.newViolations().forEach(v -> System.out.println("  + " + v));
+    }
+    if (!comparison.resolvedViolations().isEmpty()) {
+      System.out.println("Resolved violations:");
+      comparison.resolvedViolations().forEach(v -> System.out.println("  - " + v));
     }
   }
 

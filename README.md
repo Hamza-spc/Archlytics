@@ -106,6 +106,10 @@ java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --format both
 
 # Skip AI — graph, rules, and diagrams only (no API key needed)
 java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --skip-ai
+
+# Save snapshot and compare architecture drift over time
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --save-snapshot
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --compare latest
 ```
 
 ---
@@ -180,6 +184,20 @@ Deterministic scoring (not AI):
 | 80–100 | Healthy |
 | 60–79 | Needs attention |
 | 0–59 | Critical |
+
+## Architecture drift
+
+Save snapshots in the analyzed repository and compare runs over time:
+
+```bash
+# First run — save baseline
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --save-snapshot --skip-ai
+
+# Later run — compare against latest snapshot
+java -jar target/archlytics-0.1.0-SNAPSHOT.jar ./my-repo --compare latest --skip-ai
+```
+
+Snapshots are stored in `<repo>/.archlytics/snapshots/` as JSON. Reports include score drift, new violations, and resolved violations.
 
 ## What it detects
 

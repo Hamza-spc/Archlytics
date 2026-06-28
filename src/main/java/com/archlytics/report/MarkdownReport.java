@@ -4,6 +4,7 @@ import com.archlytics.ai.AiAnalysisResult;
 import com.archlytics.graph.DependencyGraph;
 import com.archlytics.graph.GraphMetrics;
 import com.archlytics.rules.Violation;
+import com.archlytics.snapshot.RunComparison;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -22,11 +23,13 @@ public final class MarkdownReport {
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
       HealthScore healthScore,
+      RunComparison comparison,
       AiAnalysisResult ai) {
     StringBuilder md = new StringBuilder();
 
     md.append("# Archlytics Architecture Report\n\n");
     appendHealthScore(md, healthScore);
+    appendComparison(md, comparison);
     md.append("**Repository:** `").append(repoPath).append("`\n\n");
     md.append("**Generated:** ")
         .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
@@ -54,11 +57,13 @@ public final class MarkdownReport {
       GraphMetrics.Metrics metrics,
       List<Violation> violations,
       ArchitectureDiagrams diagrams,
-      HealthScore healthScore) {
+      HealthScore healthScore,
+      RunComparison comparison) {
     StringBuilder md = new StringBuilder();
 
     md.append("# Archlytics Architecture Report\n\n");
     appendHealthScore(md, healthScore);
+    appendComparison(md, comparison);
     md.append("**Repository:** `").append(repoPath).append("`\n\n");
     md.append("**Generated:** ")
         .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
@@ -90,6 +95,40 @@ public final class MarkdownReport {
         md.append(index++).append(". ").append(risk).append("\n");
       }
       md.append("\n");
+    }
+  }
+
+  private static void appendComparison(StringBuilder md, RunComparison comparison) {
+    if (comparison == null) {
+      return;
+    }
+
+    md.append("## Architecture Drift\n\n");
+    md.append("**Health score:** ")
+        .append(comparison.scoreSummary())
+        .append("\n\n");
+    md.append("**Baseline captured:** ")
+        .append(comparison.baseline().capturedAt())
+        .append("\n\n");
+
+    if (!comparison.newViolations().isEmpty()) {
+      md.append("### New violations\n\n");
+      for (var violation : comparison.newViolations()) {
+        md.append("- ").append(violation).append("\n");
+      }
+      md.append("\n");
+    }
+
+    if (!comparison.resolvedViolations().isEmpty()) {
+      md.append("### Resolved violations\n\n");
+      for (var violation : comparison.resolvedViolations()) {
+        md.append("- ").append(violation).append("\n");
+      }
+      md.append("\n");
+    }
+
+    if (comparison.newViolations().isEmpty() && comparison.resolvedViolations().isEmpty()) {
+      md.append("_No violation changes since baseline._\n\n");
     }
   }
 
