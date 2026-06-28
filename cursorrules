@@ -1,0 +1,3 @@
+After each phase you should absolutely fully test the current phase before moving to the next.
+After each phase you use the 3 git commands (git add ., git commit -m "xyz", git push)
+After each phase you explain the steps that you've done so far 
