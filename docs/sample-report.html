@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archlytics Report</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>:root {
+  --bg: #0f1419;
+  --card: #1a2332;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --border: #30363d;
+  --healthy: #3fb950;
+  --warning: #d29922;
+  --critical: #f85149;
+  --high: #f85149;
+  --medium: #d29922;
+  --low: #58a6ff;
+  --accent: #58a6ff;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+.container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+h1 { margin: 0 0 0.5rem; font-size: 1.75rem; }
+h2 { margin-top: 0; font-size: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+.meta { color: var(--muted); margin: 0.25rem 0; font-size: 0.9rem; }
+code { background: #21262d; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+.print-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.print-btn:hover { opacity: 0.9; }
+.dashboard {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.score-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+}
+.score-value { font-size: 3.5rem; font-weight: 700; line-height: 1; }
+.score-label { color: var(--muted); margin-top: 0.5rem; }
+.score-healthy .score-value { color: var(--healthy); }
+.score-warning .score-value { color: var(--warning); }
+.score-critical .score-value { color: var(--critical); }
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+}
+.stat-value { font-size: 1.5rem; font-weight: 700; }
+.stat-label { color: var(--muted); font-size: 0.85rem; }
+.top-risks {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+.top-risks ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.drift { border-color: var(--accent); }
+.notice { border-color: var(--warning); }
+.architecture-type {
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+.muted { color: var(--muted); }
+.violations { display: grid; gap: 0.75rem; }
+.violation {
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+.violation p { margin: 0.35rem 0 0; }
+.rule { color: var(--muted); font-size: 0.85rem; }
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.badge-high { background: rgba(248,81,73,0.15); color: var(--high); }
+.badge-medium { background: rgba(210,153,34,0.15); color: var(--medium); }
+.badge-low { background: rgba(88,166,255,0.15); color: var(--low); }
+.risk-card, .rec-card {
+  background: #161b22;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.diagram-block {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+.diagram-block h3 { color: #24292f; }
+.footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 2rem;
+}
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  .card, .score-card, .stat, .top-risks, .violation, .risk-card, .rec-card {
+    background: #fff;
+    border-color: #ccc;
+    break-inside: avoid;
+  }
+  .score-healthy .score-value, .score-warning .score-value, .score-critical .score-value {
+    color: #000;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header class="header">
+<div>
+<h1>Archlytics Architecture Report</h1>
+<p class="meta">Repository: <code>/Users/hamza/dev/maroctax</code></p>
+<p class="meta">Generated: 2026-06-29 00:34</p>
+</div>
+<button class="print-btn no-print" onclick="window.print()">Print / Save PDF</button>
+</header>
+<section class="dashboard">
+<div class="score-card score-critical">
+<div class="score-value">55</div>
+<div class="score-label">/ 100 — Critical</div>
+</div>
+<div class="stat-grid">
+<div class="stat"><div class="stat-value">28</div><div class="stat-label">Java files</div></div>
+<div class="stat"><div class="stat-value">3</div><div class="stat-label">Modules</div></div>
+<div class="stat"><div class="stat-value">6</div><div class="stat-label">Violations</div></div>
+</div>
+<div class="top-risks">
+<h3>Top risks</h3><ol>
+<li>Shared kernel bottleneck — maroctax-core is depended on by 2 modules — under load, this becomes a central scaling bottleneck and single point of contention</li>
+<li>Layer bypass detected — maroctax-api depends directly on maroctax-core while also using maroctax-spring-boot-starter — bypassing an intermediate module couples layers and complicates scaling</li>
+<li>Serial dependency chain — Longest synchronous module path is 3 modules: maroctax-api → maroctax-spring-boot-starter → maroctax-core — deep chains increase latency and prevent independent scaling</li>
+</ol></div>
+</section>
+<section class="card notice"><p>AI analysis skipped. Deterministic analysis only.</p></section>
+<section class="card"><h2>Graph Metrics</h2><ul>
+<li><strong>Longest chain:</strong> maroctax-api → maroctax-spring-boot-starter → maroctax-core</li>
+<li><strong>Entry points:</strong> maroctax-api</li>
+<li><strong>Shared-kernel hubs:</strong> maroctax-core</li>
+<li><strong>Layer bypasses:</strong> maroctax-api depends directly on maroctax-core while also using maroctax-spring-boot-starter</li>
+</ul></section>
+<section class="card"><h2>Module Dependencies</h2><ul>
+<li><strong>maroctax-api</strong> → maroctax-core, maroctax-spring-boot-starter</li>
+<li><strong>maroctax-spring-boot-starter</strong> → maroctax-core</li>
+</ul></section>
+<section class="card"><h2>Violations</h2>
+<div class="violations">
+<div class="violation"><span class="badge badge-high">HIGH</span> <strong>Shared kernel bottleneck</strong><p>maroctax-core is depended on by 2 modules — under load, this becomes a central scaling bottleneck and single point of contention</p><p class="rule">rule: system-design</p></div>
+<div class="violation"><span class="badge badge-medium">MEDIUM</span> <strong>Layer bypass detected</strong><p>maroctax-api depends directly on maroctax-core while also using maroctax-spring-boot-starter — bypassing an intermediate module couples layers and complicates scaling</p><p class="rule">rule: system-design</p></div>
+<div class="violation"><span class="badge badge-medium">MEDIUM</span> <strong>Serial dependency chain</strong><p>Longest synchronous module path is 3 modules: maroctax-api → maroctax-spring-boot-starter → maroctax-core — deep chains increase latency and prevent independent scaling</p><p class="rule">rule: system-design</p></div>
+<div class="violation"><span class="badge badge-low">LOW</span> <strong>File has many internal dependencies</strong><p>java/maroctax-api/src/main/java/ma/maroctax/api/controller/PayrollController.java imports 8 internal types (threshold: 6)</p><p class="rule">rule: high-coupling</p></div>
+<div class="violation"><span class="badge badge-low">LOW</span> <strong>File has many internal dependencies</strong><p>java/maroctax-spring-boot-starter/src/main/java/ma/maroctax/spring/MarocTaxService.java imports 8 internal types (threshold: 6)</p><p class="rule">rule: high-coupling</p></div>
+<div class="violation"><span class="badge badge-low">LOW</span> <strong>Entry module fans out to multiple backends</strong><p>maroctax-api depends directly on 2 modules (maroctax-spring-boot-starter, maroctax-core) — request handling may fan out synchronously under traffic</p><p class="rule">rule: system-design</p></div>
+</div>
+</section>
+<section class="card"><h2>System Design Issues</h2>
+<h3>From graph analysis</h3><ul>
+<li><span class="badge badge-high">HIGH</span> <strong>Shared kernel bottleneck</strong> — maroctax-core is depended on by 2 modules — under load, this becomes a central scaling bottleneck and single point of contention</li>
+<li><span class="badge badge-medium">MEDIUM</span> <strong>Layer bypass detected</strong> — maroctax-api depends directly on maroctax-core while also using maroctax-spring-boot-starter — bypassing an intermediate module couples layers and complicates scaling</li>
+<li><span class="badge badge-medium">MEDIUM</span> <strong>Serial dependency chain</strong> — Longest synchronous module path is 3 modules: maroctax-api → maroctax-spring-boot-starter → maroctax-core — deep chains increase latency and prevent independent scaling</li>
+<li><span class="badge badge-low">LOW</span> <strong>Entry module fans out to multiple backends</strong> — maroctax-api depends directly on 2 modules (maroctax-spring-boot-starter, maroctax-core) — request handling may fan out synchronously under traffic</li>
+</ul>
+</section>
+<section class="card"><h2>Scaling &amp; Bottleneck Analysis</h2>
+<p class="muted">Run without --skip-ai for AI scaling predictions.</p>
+</section>
+<section class="card"><h2>Architecture Diagrams</h2>
+<div class="diagram-block">
+<h3>Module Dependencies</h3>
+<pre class="mermaid">graph TD
+  maroctax_api[maroctax-api]
+  maroctax_core[maroctax-core]
+  maroctax_spring_boot_starter[maroctax-spring-boot-starter]
+  maroctax_api --> maroctax_core
+  maroctax_api --> maroctax_spring_boot_starter
+  maroctax_spring_boot_starter --> maroctax_core</pre>
+</div>
+<div class="diagram-block">
+<h3>Layer View</h3>
+<pre class="mermaid">graph TB
+  subgraph L0 [Presentation Layer]
+    maroctax_api[maroctax-api]
+  end
+  subgraph L1 [Integration Layer]
+    maroctax_spring_boot_starter[maroctax-spring-boot-starter]
+  end
+  subgraph L2 [Domain Layer]
+    maroctax_core[maroctax-core]
+  end
+  maroctax_api --> maroctax_core
+  maroctax_api --> maroctax_spring_boot_starter
+  maroctax_spring_boot_starter --> maroctax_core</pre>
+</div>
+<div class="diagram-block">
+<h3>Critical Path</h3>
+<pre class="mermaid">graph LR
+  maroctax_api[maroctax-api]
+  maroctax_spring_boot_starter[maroctax-spring-boot-starter]
+  maroctax_core[maroctax-core]
+  maroctax_api --> maroctax_spring_boot_starter
+  maroctax_spring_boot_starter --> maroctax_core</pre>
+</div>
+</section>
+<footer class="footer">Generated by Archlytics</footer>
+</div>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral' });</script>
+</body>
+</html>

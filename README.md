@@ -41,7 +41,7 @@ graph TB
   maroctax_spring_boot_starter --> maroctax_core
 ```
 
-See [docs/sample-report.md](docs/sample-report.md) for a full example report.
+See [docs/sample-report.md](docs/sample-report.md) for a full example report, or open [docs/sample-report.html](docs/sample-report.html) for the styled HTML version (health score **55/100** on maroctax).
 
 ---
 
@@ -239,6 +239,8 @@ jobs:
 ```
 
 The action builds Archlytics, compares the PR against its base branch, uploads a report artifact, and updates a PR comment (idempotent — one comment per PR).
+
+**Live example:** [maroctax](https://github.com/Hamza-spc/maroctax) runs this action on every Java PR — see [`.github/workflows/archlytics.yml`](https://github.com/Hamza-spc/maroctax/blob/main/.github/workflows/archlytics.yml).
 
 ### CI exit codes
 
